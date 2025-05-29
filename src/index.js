@@ -26,6 +26,11 @@ function loadData() {
     }
     const dataFile = fs.readFileSync(filePath)
     data = JSON.parse(dataFile.toString())
+    data = data.map(item => {
+        const { date, ...res } = item
+        const new_date = new Date(date)
+        return { ...res, date: new_date }
+    })
 }
 
 function saveData() {
@@ -48,7 +53,7 @@ const commands = {
             const id = data.length + 1
             const item = {
                 id: id,
-                date: Date.now(),
+                date: new Date(),
                 description,
                 amount
             }
@@ -58,9 +63,17 @@ const commands = {
     },
     summary: {
         name: 'summary',
-        action: function () {
-            const result = data.map(item => item.amount).reduce((acc, curr) => acc + curr, 0)
-            console.log(`Total expenses for August: ${getFormatedAmount(result)}`)
+        action: function (month) {
+
+            if (month != undefined) {
+                const _data = data.filter(item => item.date.getMonth() === (month - 1))
+                const result = _data.map(item => item.amount).reduce((acc, curr) => acc + curr, 0)
+                const months = ["jan", "feb", "mar", "apr", "may", "jun", "july", "aug", "sep", "oct", "nov", "dec"]
+                console.log(`Total expenses for ${months[month - 1]}: ${getFormatedAmount(result)}`)
+            } else {
+                const result = data.map(item => item.amount).reduce((acc, curr) => acc + curr, 0)
+                console.log(`Total expenses for August: ${getFormatedAmount(result)}`)
+            }
         }
     },
     delete: {
@@ -70,6 +83,10 @@ const commands = {
 }
 
 function execute_command(context) {
+    if (context._.length == 0) {
+        console.log('no cammand')
+        return
+    }
     const command = commands[context._[0]]
 
     const arguments_by_command = {
