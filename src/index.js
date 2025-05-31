@@ -2,6 +2,7 @@ import os from 'node:os'
 import fs from 'node:fs'
 import path from 'node:path'
 import yargs from 'yargs-parser'
+import Table from 'cli-table3'
 
 const homeDir = os.userInfo().homedir
 const dataFileName = 'data.json'
@@ -15,6 +16,20 @@ function getFormatedAmount(amount) {
         currency: 'COP',
     })
     return cop.format(amount)
+}
+
+function getFormatDate(date) {
+    return (new Intl.DateTimeFormat(language)).format(date)
+}
+
+function mapTable(data) {
+    const t = new Table({
+        head: ['Id', 'Date', 'Description', 'Amount']
+    })
+    data.map(item => {
+        t.push([item.id, getFormatDate(item.date), item.description, getFormatedAmount(item.amount)])
+    })
+    return t.toString()
 }
 
 function loadData() {
@@ -44,7 +59,9 @@ const commands = {
             if (data.length == 0) {
                 console.log('no hay registros')
             }
-            else console.table(data)
+            else {
+                console.log(mapTable(data))
+            }
         }
     },
     add: {
@@ -58,7 +75,7 @@ const commands = {
                 amount
             }
             data.push(item)
-            console.log`Expense added successfully (ID: ${id})`
+            console.log(`Expense added successfully (ID: ${id})`)
         }
     },
     summary: {
