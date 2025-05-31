@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import yargs from 'yargs-parser'
 import Table from 'cli-table3'
+import chalk from 'chalk'
 
 const homeDir = os.userInfo().homedir
 const dataFileName = 'data.json'
@@ -11,15 +12,16 @@ const language = Intl.DateTimeFormat().resolvedOptions().locale
 let data = []
 
 function getFormatedAmount(amount) {
-    let cop = new Intl.NumberFormat(language, {
+    const numberFormater = new Intl.NumberFormat(language, {
         style: 'currency',
         currency: 'COP',
     })
-    return cop.format(amount)
+    return numberFormater.format(amount)
 }
 
 function getFormatDate(date) {
-    return (new Intl.DateTimeFormat(language)).format(date)
+    const dateFormater = new Intl.DateTimeFormat(language)
+    return dateFormater.format(date)
 }
 
 function mapTable(data) {
@@ -110,24 +112,53 @@ const commands = {
     }
 }
 
-function execute_command(context) {
+function printCommandInfo() {
+    console.log(``)
+    console.log(chalk.bold('\tExpenses Manager v0.0'))
+    console.log(`\tThis CLI tool helps you keep track of your personal expenses locally on this machine.`)
+    console.log(``)
+    console.log(chalk.bold('\tAvailable Commands:'))
+
+    console.log(`\t${chalk.redBright('list')}`)
+    console.log(`\t\tDisplays all recorded expenses.`)
+    console.log(`\t\tExample: ${chalk.cyan('node index.js list')}`)
+    console.log(``)
+
+    console.log(`\t${chalk.yellow('add')} --description [desc] --amount [value]`)
+    console.log(`\t\tAdds a new expense with a description and an amount.`)
+    console.log(`\t\tExample: ${chalk.cyan('node index.js add --description "Lunch" --amount 12000')}`)
+    console.log(``)
+
+    console.log(`\t${chalk.yellowBright('summary')} [--month <1-12>]`)
+    console.log(`\t\tDisplays the total expenses. Optionally filter by month (1=Jan, 12=Dec).`)
+    console.log(`\t\tExample: ${chalk.cyan('node index.js summary --month 5')}`)
+    console.log(``)
+
+    console.log(`\t${chalk.greenBright('delete')} --id [number]`)
+    console.log(`\t\tDeletes an expense by its ID.`)
+    console.log(`\t\tExample: ${chalk.cyan('node index.js delete --id 3')}`)
+    console.log(``)
+}
+
+
+function executeCommand(context) {
     if (context._.length == 0) {
-        console.log('no cammand')
+        printCommandInfo()
         return
     }
     const command = commands[context._[0]]
 
-    const arguments_by_command = {
+    const argumentsByCommand = {
         list: [],
         add: ['description', 'amount'],
         summary: ['month'],
-        delete: ['id']
+        delete: ['id'],
     }
 
-    const params = arguments_by_command[command.name].map(name => context[name])
+    const params = argumentsByCommand[command.name].map(name => context[name])
     command.action(...params)
 }
 
 loadData()
-execute_command(yargs(process.argv.slice(2)))
+executeCommand(yargs(process.argv.slice(2)))
 saveData()
