@@ -2,151 +2,52 @@ import os from 'node:os'
 import fs from 'node:fs'
 import path from 'node:path'
 import yargs from 'yargs-parser'
-import Table from 'cli-table3'
-import chalk from 'chalk'
+import { loadData, saveData } from './utils/data.js'
+import { pathToFileURL } from 'url'
 
+const appName = 'expenses'
 const homeDir = os.userInfo().homedir
 const dataFileName = 'data.json'
-const filePath = path.join(homeDir, 'expenses', dataFileName)
-const language = Intl.DateTimeFormat().resolvedOptions().locale
-let data = []
+const filePath = path.join(homeDir, appName, dataFileName)
+const commandsPath = './src/commands'
 
-function getFormatedAmount(amount) {
-    const numberFormater = new Intl.NumberFormat(language, {
-        style: 'currency',
-        currency: 'COP',
-    })
-    return numberFormater.format(amount)
-}
-
-function getFormatDate(date) {
-    const dateFormater = new Intl.DateTimeFormat(language)
-    return dateFormater.format(date)
-}
-
-function mapTable(data) {
-    const t = new Table({
-        head: ['Id', 'Date', 'Description', 'Amount']
-    })
-    data.map(item => {
-        t.push([item.id, getFormatDate(item.date), item.description, getFormatedAmount(item.amount)])
-    })
-    return t.toString()
-}
-
-function loadData() {
-    if (!fs.existsSync(path.join(homeDir, 'expenses'))) {
-        fs.mkdirSync(path.join(homeDir, 'expenses'))
+async function getCommands() {
+    const commands = {}
+    const commandPath = path.resolve(commandsPath)
+    for (const fileName of fs.readdirSync(commandPath)) {
+        const [name, extension] = fileName.split('.')
+        if (extension === 'js') {
+            const fullPath = path.join(commandPath, fileName)
+            const fileUrl = pathToFileURL(fullPath).href
+            const module = await import(fileUrl)
+            commands[name] = module.default || module
+        }
     }
-    if (!fs.existsSync(filePath)) {
-        fs.writeFileSync(filePath, '[]')
-    }
-    const dataFile = fs.readFileSync(filePath)
-    data = JSON.parse(dataFile.toString())
-    data = data.map(item => {
-        const { date, ...res } = item
-        const new_date = new Date(date)
-        return { ...res, date: new_date }
-    })
+    return commands
 }
 
-function saveData() {
-    fs.writeFileSync(filePath, JSON.stringify(data))
-}
+function syncData(action, data) {
+    switch (action) {
+        case 'load':
+            // if (data != undefined) return data
+            return loadData(homeDir, appName, filePath, data)
 
-const commands = {
-    list: {
-        name: 'list',
-        action: function () {
-            if (data.length == 0) {
-                console.log('no hay registros')
-            }
-            else {
-                console.log(mapTable(data))
-            }
-        }
-    },
-    add: {
-        name: 'add',
-        action: function (description, amount) {
-            const id = data.length + 1
-            const item = {
-                id: id,
-                date: new Date(),
-                description,
-                amount
-            }
-            data.push(item)
-            console.log(`Expense added successfully (ID: ${id})`)
-        }
-    },
-    summary: {
-        name: 'summary',
-        action: function (month) {
-
-            if (month != undefined) {
-                const _data = data.filter(item => item.date.getMonth() === (month - 1))
-                const result = _data.map(item => item.amount).reduce((acc, curr) => acc + curr, 0)
-                const months = ["jan", "feb", "mar", "apr", "may", "jun", "july", "aug", "sep", "oct", "nov", "dec"]
-                console.log(`Total expenses for ${months[month - 1]}: ${getFormatedAmount(result)}`)
-            } else {
-                const result = data.map(item => item.amount).reduce((acc, curr) => acc + curr, 0)
-                console.log(`Total expenses for August: ${getFormatedAmount(result)}`)
-            }
-        }
-    },
-    delete: {
-        name: 'delete',
-        action: function (id) {
-            const item = data.find(item => item.id === id)
-            const index = data.indexOf(item)
-            if (item != undefined && index > 0) {
-
-                data.splice(index, 1)
-                console.log('Expense deleted successfully')
-            }
-            else {
-                console.log(`Expense with id: ${id} not found`)
-            }
-        }
+        case 'save':
+            // if (data != undefined) return null,
+            saveData(filePath, data)
+            return null
     }
 }
 
-function printCommandInfo() {
-    console.log(``)
-    console.log(chalk.bold('\tExpenses Manager v0.0'))
-    console.log(`\tThis CLI tool helps you keep track of your personal expenses locally on this machine.`)
-    console.log(``)
-    console.log(chalk.bold('\tAvailable Commands:'))
-
-    console.log(`\t${chalk.redBright('list')}`)
-    console.log(`\t\tDisplays all recorded expenses.`)
-    console.log(`\t\tExample: ${chalk.cyan('node index.js list')}`)
-    console.log(``)
-
-    console.log(`\t${chalk.yellow('add')} --description [desc] --amount [value]`)
-    console.log(`\t\tAdds a new expense with a description and an amount.`)
-    console.log(`\t\tExample: ${chalk.cyan('node index.js add --description "Lunch" --amount 12000')}`)
-    console.log(``)
-
-    console.log(`\t${chalk.yellowBright('summary')} [--month <1-12>]`)
-    console.log(`\t\tDisplays the total expenses. Optionally filter by month (1=Jan, 12=Dec).`)
-    console.log(`\t\tExample: ${chalk.cyan('node index.js summary --month 5')}`)
-    console.log(``)
-
-    console.log(`\t${chalk.greenBright('delete')} --id [number]`)
-    console.log(`\t\tDeletes an expense by its ID.`)
-    console.log(`\t\tExample: ${chalk.cyan('node index.js delete --id 3')}`)
-    console.log(``)
-}
-
-
-function executeCommand(context) {
+async function executeCommand(context, data) {
+    let _data = data || []
     if (context._.length == 0) {
         printCommandInfo()
         return
     }
-    const command = commands[context._[0]]
+    const commands = await getCommands()
+    const commandName = context._[0]
+    const command = commands[commandName]
 
     const argumentsByCommand = {
         list: [],
@@ -155,10 +56,16 @@ function executeCommand(context) {
         delete: ['id'],
     }
 
-    const params = argumentsByCommand[command.name].map(name => context[name])
-    command.action(...params)
+    _data = syncData('load', _data)
+    const params = argumentsByCommand[commandName].map(item => {
+        return context[item]
+    })
+    command(_data, ...params)
+    syncData('save', _data)
 }
 
-loadData()
-executeCommand(yargs(process.argv.slice(2)))
-saveData()
+await executeCommand((yargs(process.argv.slice(2))))
+
+export default function (data, command, params) {
+
+}
