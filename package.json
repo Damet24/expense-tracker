@@ -4,7 +4,7 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-   "test": "vitest"
+    "test": "cross-env NODE_ENV=test && vitest"
   },
   "keywords": [],
   "author": "",
@@ -13,6 +13,7 @@
   "dependencies": {
     "chalk": "^5.4.1",
     "cli-table3": "^0.6.5",
+    "cross-env": "^7.0.3",
     "yargs-parser": "^22.0.0"
   },
   "devDependencies": {

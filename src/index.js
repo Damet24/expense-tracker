@@ -4,6 +4,8 @@ import path from 'node:path'
 import yargs from 'yargs-parser'
 import { loadData, saveData } from './utils/data.js'
 import { pathToFileURL } from 'url'
+import printCommandInfo from './commands/help.js'
+import { isTest } from './utils/environment.js'
 
 const appName = 'expenses'
 const homeDir = os.userInfo().homedir
@@ -29,19 +31,21 @@ async function getCommands() {
 function syncData(action, data) {
     switch (action) {
         case 'load':
-            // if (data != undefined) return data
+            if (data != undefined) return data
             return loadData(homeDir, appName, filePath, data)
 
         case 'save':
-            // if (data != undefined) return null,
+            if (data != undefined) return null,
             saveData(filePath, data)
             return null
     }
 }
 
 async function executeCommand(context, data) {
+
     let _data = data || []
-    if (context._.length == 0) {
+    console.log(context, data)
+    if (context._.length === 0) {
         printCommandInfo()
         return
     }
@@ -60,12 +64,18 @@ async function executeCommand(context, data) {
     const params = argumentsByCommand[commandName].map(item => {
         return context[item]
     })
-    command(_data, ...params)
+    try {
+        command(_data, ...params)
+    } catch (error) {
+    }
     syncData('save', _data)
 }
 
-await executeCommand((yargs(process.argv.slice(2))))
+if (!isTest()) await executeCommand((yargs(process.argv.slice(2))))
 
-export default function (data, command, params) {
+export default async function (data, command, params) {
+    const context = { _: [command], params }
+    await executeCommand(context, data)
 
+    return { data, command, params }
 }
